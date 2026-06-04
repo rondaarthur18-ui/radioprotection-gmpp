@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-black text-edf-500">Suivi QSSER</h1>
+  <button onclick="openQModal()" class="btn bg-green-600 text-white font-bold px-4 py-2 rounded-xl text-sm">+ Nouvelle action</button>
+</div>
+
+<!-- Stats rapides -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+  {% for lbl,val,col in [('Ouvertes',stats.ouvertes,'red'),('En cours',stats.en_cours,'yellow'),('Cloturees',stats.clotures,'green'),('Gain cloture',stats.gain|string+' mSv.h','purple')] %}
+  <div class="card bg-white rounded-2xl p-3 text-center">
+    <div class="text-2xl font-black text-{{col}}-600">{{val}}</div>
+    <div class="text-xs text-gray-400 mt-0.5">{{lbl}}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Filtres -->
+<form method="get" class="card bg-white rounded-2xl p-3 mb-4 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs font-bold text-gray-500 mb-1">Statut</label>
+    <select name="statut" class="border border-gray-200 rounded-xl px-3 py-2 text-sm" onchange="this.form.submit()">
+      <option value="">Tous</option>
+      {% for s in statuts %}<option value="{{s}}" {% if filter_statut==s %}selected{% endif %}>{{s}}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-bold text-gray-500 mb-1">Priorite</label>
+    <select name="priorite" class="border border-gray-200 rounded-xl px-3 py-2 text-sm" onchange="this.form.submit()">
+      <option value="">Toutes</option>
+      {% for p in priorites %}<option value="{{p}}" {% if filter_priorite==p %}selected{% endif %}>{{p}}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="flex gap-2">
+    {% for lbl,st,col in [('Ouvertes','Ouverte','red'),('En cours','En cours','yellow'),('Cloturees','Cloturee','green')] %}
+    <a href="/qsser?statut={{st}}" class="btn bg-{{col}}-100 text-{{col}}-700 text-xs font-bold px-3 py-2 rounded-xl">{{lbl}}</a>
+    {% endfor %}
+    <a href="/qsser" class="btn bg-gray-100 text-gray-600 text-xs font-bold px-3 py-2 rounded-xl">Tous</a>
+  </div>
+</form>
+
+<!-- Table -->
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Titre</th><th>Priorite</th><th>Statut</th><th>Responsable</th><th>Gain (mSv.h)</th><th>Echeance</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for a in actions %}
+      <tr class="{% if a.statut=='Ouverte' %}bg-red-50{% elif a.statut=='En cours' %}bg-yellow-50{% elif a.statut=='Cloturee' %}bg-green-50{% endif %}">
+        <td class="font-semibold max-w-xs truncate" title="{{a.titre}}">{{a.titre}}</td>
+        <td>
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full
+            {% if a.priorite=='Haute' %}bg-red-100 text-red-700
+            {% elif a.priorite=='Moyenne' %}bg-orange-100 text-orange-700
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{a.priorite}}
+          </span>
+        </td>
+        <td>
+          <select onchange="updateStatut({{a.id}},this.value)" class="text-xs border border-gray-200 rounded-lg px-2 py-1 font-semibold
+            {% if a.statut=='Ouverte' %}text-red-700{% elif a.statut=='En cours' %}text-yellow-700{% elif a.statut=='Cloturee' %}text-green-700{% else %}text-gray-600{% endif %}">
+            {% for s in statuts %}
+            <option value="{{s}}" {% if a.statut==s %}selected{% endif %}>{{s}}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="text-sm text-gray-600">{{a.get('responsable','')}}</td>
+        <td class="font-bold text-green-700">{{a.get('gain_estime',0)}}</td>
+        <td class="text-sm text-gray-500">{{a.get('echeance','')}}</td>
+        <td class="flex gap-1">
+          <button onclick="openQModal({{a|tojson}})" class="btn bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-blue-200">Edit</button>
+          {% if a.statut!='Cloturee' %}
+          <button onclick="closeAction({{a.id}})" class="btn bg-green-100 text-green-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-green-200">Cloturer</button>
+          {% endif %}
+          <button onclick="deleteQ({{a.id}},'{{a.titre[:15]}}')" class="btn bg-red-100 text-red-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-red-200">X</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not actions %}
+      <tr><td colspan="7" class="text-center text-gray-400 py-12 text-sm">Aucune action — cliquez "+ Nouvelle action"</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="qmodal" class="modal-bg hidden" onclick="if(event.target===this)closeQModal()">
+<div class="modal">
+  <div class="flex items-center justify-between mb-4">
+    <h2 id="qmodal-title" class="text-lg font-black text-edf-500">Nouvelle action QSSER</h2>
+    <button onclick="closeQModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+  </div>
+  <div class="space-y-3">
+    <input type="hidden" id="q-id">
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Titre *</label>
+      <input id="q-titre" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Priorite</label>
+        <select id="q-priorite" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+          {% for p in priorites %}<option value="{{p}}">{{p}}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Statut</label>
+        <select id="q-statut" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+          {% for s in statuts %}<option value="{{s}}">{{s}}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Responsable</label>
+        <input id="q-resp" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Gain estime (mSv.h)</label>
+        <input id="q-gain" type="number" step="0.1" value="0" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Echeance</label>
+      <input id="q-ech" type="date" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Description</label>
+      <textarea id="q-desc" rows="2" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"></textarea>
+    </div>
+    <div class="flex gap-3 pt-1">
+      <button onclick="saveQ()" class="btn flex-1 bg-green-600 text-white font-bold py-3 rounded-xl">Enregistrer</button>
+      <button onclick="closeQModal()" class="btn flex-1 bg-gray-100 text-gray-700 font-bold py-3 rounded-xl">Annuler</button>
+    </div>
+  </div>
+</div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const statuts={{statuts|tojson}};
+let qEditId=null;
+function openQModal(a=null){
+  qEditId=a?a.id:null;
+  document.getElementById('qmodal-title').textContent=a?'Modifier':'Nouvelle action QSSER';
+  document.getElementById('q-titre').value=a?a.titre:'';
+  document.getElementById('q-priorite').value=a?a.priorite:'Moyenne';
+  document.getElementById('q-statut').value=a?a.statut:'Ouverte';
+  document.getElementById('q-resp').value=a?a.responsable||'':'';
+  document.getElementById('q-gain').value=a?a.gain_estime||0:0;
+  document.getElementById('q-ech').value=a?a.echeance||'':'';
+  document.getElementById('q-desc').value=a?a.description||'':'';
+  document.getElementById('qmodal').classList.remove('hidden');
+}
+function closeQModal(){document.getElementById('qmodal').classList.add('hidden');}
+async function saveQ(){
+  const titre=document.getElementById('q-titre').value.trim();
+  if(!titre){showToast('Titre obligatoire','red');return;}
+  const body={titre,priorite:document.getElementById('q-priorite').value,statut:document.getElementById('q-statut').value,responsable:document.getElementById('q-resp').value,gain_estime:+document.getElementById('q-gain').value,echeance:document.getElementById('q-ech').value,description:document.getElementById('q-desc').value};
+  const url=qEditId?`/api/qsser/${qEditId}`:'/api/qsser';
+  const r=await apiFetch(url,qEditId?'PUT':'POST',body);
+  if(r.ok){showToast(qEditId?'Modifie !':'Ajoute !');closeQModal();setTimeout(()=>location.reload(),500);}
+}
+async function updateStatut(id,statut){
+  await apiFetch(`/api/qsser/${id}`,'PUT',{statut});
+  showToast('Statut mis a jour !');
+}
+async function closeAction(id){
+  await apiFetch(`/api/qsser/${id}`,'PUT',{statut:'Cloturee'});
+  showToast('Cloture !'); setTimeout(()=>location.reload(),500);
+}
+async function deleteQ(id,titre){
+  if(!confirm(`Supprimer "${titre}" ?`))return;
+  const r=await apiFetch(`/api/qsser/${id}`,'DELETE');
+  if(r.ok){showToast('Supprime !');setTimeout(()=>location.reload(),500);}
+}
+</script>
+{% endblock %}
