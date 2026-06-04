@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Connexion — RadioProtection GMPP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 flex items-center justify-center px-4">
+
+<div class="w-full max-w-sm">
+  <!-- Logo / Titre -->
+  <div class="text-center mb-8">
+    <div class="text-5xl mb-3">☢️</div>
+    <h1 class="text-white text-2xl font-black tracking-tight">RadioProtection GMPP</h1>
+    <p class="text-blue-300 text-sm mt-1">EDF — AMT Centre</p>
+  </div>
+
+  <!-- Carte de connexion -->
+  <div class="bg-white rounded-3xl shadow-2xl p-8">
+    <h2 class="text-gray-800 font-black text-lg mb-6 text-center">Connexion sécurisée</h2>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 mb-4 text-sm font-semibold flex items-center gap-2">
+      <span>⚠️</span> {{error}}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/login" class="space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Identifiant</label>
+        <input name="username" type="text" required autofocus
+               class="w-full border-2 border-gray-100 focus:border-blue-500 rounded-2xl px-4 py-3 text-sm font-semibold outline-none transition-colors"
+               placeholder="Votre identifiant">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wide">Mot de passe</label>
+        <div class="relative">
+          <input name="password" id="pwd" type="password" required
+                 class="w-full border-2 border-gray-100 focus:border-blue-500 rounded-2xl px-4 py-3 text-sm font-semibold outline-none transition-colors pr-12"
+                 placeholder="••••••••">
+          <button type="button" onclick="togglePwd()"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg px-1">
+            👁
+          </button>
+        </div>
+      </div>
+      <button type="submit"
+              class="w-full bg-blue-800 hover:bg-blue-900 active:scale-95 transition-all text-white font-black py-3.5 rounded-2xl text-base shadow-lg mt-2">
+        Se connecter
+      </button>
+    </form>
+
+    <div class="mt-6 pt-5 border-t border-gray-100 text-center">
+      <div class="flex items-center justify-center gap-2 text-xs text-gray-400">
+        <span>🔒</span>
+        <span>Connexion HTTPS chiffrée</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="text-blue-400 text-xs text-center mt-6">
+    Accès réservé au personnel autorisé EDF
+  </p>
+</div>
+
+<script>
+function togglePwd(){
+  const p=document.getElementById('pwd');
+  p.type=p.type==='password'?'text':'password';
+}
+</script>
+</body>
+</html>
