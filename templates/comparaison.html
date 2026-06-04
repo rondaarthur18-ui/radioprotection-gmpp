@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-xl font-black text-edf-500 mb-4">Comparaison des paliers</h1>
+<div class="grid sm:grid-cols-3 gap-3 mb-5">
+{% for p in paliers %}
+{% set s=stats[p] %}
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="{% if p==900 %}bg-blue-700{% elif p==1300 %}bg-orange-500{% else %}bg-green-700{% endif %} text-white px-4 py-2.5 font-black text-base">{{p}} MW</div>
+  <div class="p-4 space-y-2">
+    {% for lbl,val,unit in [('Nb activites',s.nb,''),('Dose totale',s.dose_totale,'mSv.h'),('Dose moy.',s.dose_moy,'mSv.h'),('Dose max',s.dose_max,'mSv.h'),('Duree totale',s.duree,'h')] %}
+    <div class="flex justify-between text-sm">
+      <span class="text-gray-500">{{lbl}}</span>
+      <span class="font-bold {% if lbl=='Dose max' and s.dose_max>seuil %}text-red-600{% endif %}">{{val}} {{unit}}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+</div>
+
+<div class="grid sm:grid-cols-2 gap-4 mb-5">
+  <div class="card bg-white rounded-2xl p-4">
+    <div class="font-bold text-gray-700 mb-3 text-sm">Dose totale par palier</div>
+    <canvas id="chartTotal" height="200"></canvas>
+  </div>
+  <div class="card bg-white rounded-2xl p-4">
+    <div class="font-bold text-gray-700 mb-3 text-sm">Comparaison par activite (top 8)</div>
+    <canvas id="chartComp" height="200"></canvas>
+  </div>
+</div>
+
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="bg-blue-800 text-white font-bold text-sm px-4 py-2.5">Tableau croise — activite x palier</div>
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Activite</th>
+        {% for p in paliers %}<th>{{p}} MW</th>{% endfor %}
+        <th>Tendance</th>
+      </tr></thead>
+      <tbody>
+      {% for row in tableau %}
+      <tr>
+        <td class="font-semibold text-sm truncate max-w-xs" title="{{row.nom}}">{{row.nom}}</td>
+        {% for p in paliers %}
+        <td class="text-center {% if row[p] and row[p]>seuil %}text-red-600 font-bold{% endif %}">
+          {{row[p] if row[p] else '—'}}
+        </td>
+        {% endfor %}
+        <td class="text-center">
+          {% if row.tendance=='hausse' %}
+          <span class="tag-critique text-xs px-2 py-0.5 rounded-full font-bold">Hausse 1450</span>
+          {% elif row.tendance=='stable' %}
+          <span class="tag-ok text-xs px-2 py-0.5 rounded-full">Stable</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const paliers={{paliers|tojson}}; const stats={{stats|tojson}}; const seuil={{seuil}};
+const tableau={{tableau|tojson}};
+const pc=['#003B8E','#FF7900','#2E8648'];
+
+new Chart(document.getElementById('chartTotal'),{type:'bar',data:{
+  labels:paliers.map(p=>p+' MW'),
+  datasets:[{label:'Dose totale (mSv.h)',data:paliers.map(p=>stats[p]?.dose_totale||0),backgroundColor:pc,borderRadius:8}]
+},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+
+const top8=tableau.slice(0,8);
+new Chart(document.getElementById('chartComp'),{type:'bar',data:{
+  labels:top8.map(r=>r.nom.length>16?r.nom.substring(0,16)+'…':r.nom),
+  datasets:paliers.map((p,i)=>({label:p+' MW',data:top8.map(r=>r[p]||0),backgroundColor:pc[i],borderRadius:4}))
+},options:{responsive:true,plugins:{legend:{position:'top'}},scales:{y:{beginAtZero:true}}}});
+</script>
+{% endblock %}
