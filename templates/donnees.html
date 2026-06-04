@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-black text-edf-500">Saisie & Donnees</h1>
+  <button onclick="openModal()" class="btn bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl text-sm">+ Ajouter</button>
+</div>
+
+<!-- Stats bar -->
+<div class="flex gap-3 mb-4 flex-wrap">
+  <div class="bg-blue-50 text-blue-700 font-bold text-sm px-3 py-1.5 rounded-xl">{{activites|length}} activite(s)</div>
+  <div class="bg-orange-50 text-orange-700 font-bold text-sm px-3 py-1.5 rounded-xl">Dose totale : {{total_dc}} mSv.h</div>
+  {% if nb_critiques>0 %}<div class="bg-red-50 text-red-700 font-bold text-sm px-3 py-1.5 rounded-xl">{{nb_critiques}} critique(s)</div>{% endif %}
+</div>
+
+<!-- Filtres -->
+<form method="get" class="card bg-white rounded-2xl p-4 mb-4 flex flex-wrap gap-3 items-end">
+  <div>
+    <label class="block text-xs font-bold text-gray-500 mb-1">Palier</label>
+    <select name="palier" class="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-blue-500" onchange="this.form.submit()">
+      <option value="">Tous</option>
+      {% for p in paliers %}<option value="{{p}}" {% if filter_palier==p|string %}selected{% endif %}>{{p}} MW</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-bold text-gray-500 mb-1">Statut</label>
+    <select name="statut" class="border border-gray-200 rounded-xl px-3 py-2 text-sm" onchange="this.form.submit()">
+      <option value="">Tous</option>
+      {% for s in statuts %}<option value="{{s}}" {% if filter_statut==s %}selected{% endif %}>{{s}}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs font-bold text-gray-500 mb-1">Trier par</label>
+    <select name="tri" class="border border-gray-200 rounded-xl px-3 py-2 text-sm" onchange="this.form.submit()">
+      <option value="dose_desc" {% if tri=='dose_desc' %}selected{% endif %}>Dose (+ dosant)</option>
+      <option value="dose_asc"  {% if tri=='dose_asc'  %}selected{% endif %}>Dose (- dosant)</option>
+      <option value="nom_asc"   {% if tri=='nom_asc'   %}selected{% endif %}>Nom A→Z</option>
+      <option value="date_desc" {% if tri=='date_desc' %}selected{% endif %}>Date (recent)</option>
+    </select>
+  </div>
+  <div class="flex-1 min-w-32">
+    <label class="block text-xs font-bold text-gray-500 mb-1">Recherche</label>
+    <input name="q" value="{{search}}" placeholder="Nom, gamme..." class="border border-gray-200 rounded-xl px-3 py-2 text-sm w-full">
+  </div>
+  <button type="submit" class="btn bg-edf-500 text-white px-4 py-2 rounded-xl text-sm font-bold">Filtrer</button>
+  <a href="/donnees" class="btn bg-gray-100 text-gray-600 px-4 py-2 rounded-xl text-sm font-bold">Effacer</a>
+</form>
+
+<!-- Table -->
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Activite</th><th>Palier</th><th>Dose coll.\n(mSv.h)</th>
+        <th>Dose ind.</th><th>Duree (h)</th><th>Interv.</th><th>Date</th><th>Statut</th><th>Actions</th>
+      </tr></thead>
+      <tbody>
+      {% for a in activites %}
+      <tr class="{% if a.dose_collective>seuil %}bg-red-50{% elif a.dose_collective>seuil*0.8 %}bg-orange-50{% endif %}">
+        <td class="font-semibold max-w-xs">
+          <div class="truncate max-w-[180px]" title="{{a.nom}}">{{a.nom}}</div>
+          {% if a.gamme %}<div class="text-xs text-gray-400">{{a.gamme}}</div>{% endif %}
+        </td>
+        <td><span class="font-bold text-xs px-2 py-0.5 rounded-full text-white {% if a.palier==900 %}bg-blue-700{% elif a.palier==1300 %}bg-orange-500{% else %}bg-green-600{% endif %}">{{a.palier}} MW</span></td>
+        <td class="font-bold {% if a.dose_collective>seuil %}text-red-600{% endif %}">
+          {{a.dose_collective}}
+          {% if a.dose_collective>seuil %}<span class="tag-critique text-xs px-1 py-0.5 rounded ml-1">!</span>{% endif %}
+        </td>
+        <td>{{a.get('dose_indiv_max',0)}}</td>
+        <td>{{a.get('duree',0)}}h</td>
+        <td>{{a.get('nb_intervenants',0)}}</td>
+        <td class="text-xs text-gray-500">{{a.get('date','')}}</td>
+        <td>
+          <span class="text-xs px-2 py-0.5 rounded-full font-semibold
+            {% if a.statut=='Realise' %}bg-green-100 text-green-700
+            {% elif a.statut=='En cours' %}bg-yellow-100 text-yellow-700
+            {% elif a.statut=='Planifie' %}bg-blue-100 text-blue-700
+            {% else %}bg-gray-100 text-gray-600{% endif %}">
+            {{a.get('statut','')}}
+          </span>
+        </td>
+        <td class="flex gap-1">
+          <button onclick="openModal({{a|tojson}})" class="btn bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-blue-200">Edit</button>
+          <button onclick="deleteAct({{a.id}},'{{a.nom[:20]}}')" class="btn bg-red-100 text-red-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-red-200">Suppr.</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not activites %}
+      <tr><td colspan="9" class="text-center text-gray-400 py-12 text-sm">Aucune activite — cliquez "+ Ajouter" pour commencer</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal formulaire -->
+<div id="modal" class="modal-bg hidden" onclick="if(event.target===this)closeModal()">
+<div class="modal">
+  <div class="flex items-center justify-between mb-4">
+    <h2 id="modal-title" class="text-lg font-black text-edf-500">Nouvelle activite</h2>
+    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+  </div>
+  <form id="act-form" class="space-y-3">
+    <input type="hidden" id="act-id">
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Nom de l'activite *</label>
+      <input id="act-nom" list="ref-list" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="Choisir ou taper...">
+      <datalist id="ref-list">
+        {% for r in ref_noms %}<option value="{{r}}">{% endfor %}
+      </datalist>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Palier (MW) *</label>
+        <select id="act-palier" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+          {% for p in paliers %}<option value="{{p}}">{{p}} MW</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Statut</label>
+        <select id="act-statut" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+          {% for s in statuts %}<option value="{{s}}">{{s}}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Dose collective (mSv.h) *</label>
+        <input id="act-dose-c" type="number" step="0.01" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value="0">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Dose indiv. max (mSv)</label>
+        <input id="act-dose-i" type="number" step="0.001" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value="0">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Duree (h)</label>
+        <input id="act-duree" type="number" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value="8">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Nb intervenants</label>
+        <input id="act-interv" type="number" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" value="4">
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Reference gamme</label>
+        <input id="act-gamme" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-gray-600 mb-1">Date</label>
+        <input id="act-date" type="date" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+      </div>
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Zone</label>
+      <select id="act-zone" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+        <option value=""></option>
+        {% for z in zones %}<option value="{{z}}">{{z}}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-600 mb-1">Centrale</label>
+      <input id="act-centrale" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+    </div>
+    <div class="flex gap-3 pt-2">
+      <button type="button" onclick="saveAct()" class="btn flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl">Enregistrer</button>
+      <button type="button" onclick="closeModal()" class="btn flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl">Annuler</button>
+    </div>
+  </form>
+</div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+let editId=null;
+function openModal(a=null){
+  editId=a?a.id:null;
+  document.getElementById('modal-title').textContent=a?'Modifier l\'activite':'Nouvelle activite';
+  document.getElementById('act-nom').value=a?a.nom:'';
+  document.getElementById('act-palier').value=a?a.palier:900;
+  document.getElementById('act-statut').value=a?a.statut:'Realise';
+  document.getElementById('act-dose-c').value=a?a.dose_collective:0;
+  document.getElementById('act-dose-i').value=a?a.dose_indiv_max||0:0;
+  document.getElementById('act-duree').value=a?a.duree||8:8;
+  document.getElementById('act-interv').value=a?a.nb_intervenants||4:4;
+  document.getElementById('act-gamme').value=a?a.gamme||'':'';
+  document.getElementById('act-date').value=a?a.date||'':'';
+  document.getElementById('act-zone').value=a?a.zone||'':'';
+  document.getElementById('act-centrale').value=a?a.centrale||'':'';
+  document.getElementById('modal').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('modal').classList.add('hidden'); }
+async function saveAct(){
+  const nom=document.getElementById('act-nom').value.trim();
+  if(!nom){showToast('Nom obligatoire','red');return;}
+  const body={
+    nom,palier:+document.getElementById('act-palier').value,
+    statut:document.getElementById('act-statut').value,
+    dose_collective:+document.getElementById('act-dose-c').value,
+    dose_indiv_max:+document.getElementById('act-dose-i').value,
+    duree:+document.getElementById('act-duree').value,
+    nb_intervenants:+document.getElementById('act-interv').value,
+    gamme:document.getElementById('act-gamme').value,
+    date:document.getElementById('act-date').value,
+    zone:document.getElementById('act-zone').value,
+    centrale:document.getElementById('act-centrale').value,
+  };
+  const url=editId?`/api/activites/${editId}`:'/api/activites';
+  const method=editId?'PUT':'POST';
+  const r=await apiFetch(url,method,body);
+  if(r.ok){showToast(editId?'Modifie !':'Ajoute !');closeModal();setTimeout(()=>location.reload(),500);}
+  else showToast('Erreur','red');
+}
+async function deleteAct(id,nom){
+  if(!confirm(`Supprimer "${nom}" ?`))return;
+  const r=await apiFetch(`/api/activites/${id}`,'DELETE');
+  if(r.ok){showToast('Supprime !');setTimeout(()=>location.reload(),500);}
+}
+</script>
+{% endblock %}
