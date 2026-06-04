@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-black text-edf-500">Referentiel des activites</h1>
+  <button onclick="document.getElementById('add-form').classList.toggle('hidden')" class="btn bg-green-600 text-white font-bold px-4 py-2 rounded-xl text-sm">+ Ajouter</button>
+</div>
+
+<!-- Formulaire ajout -->
+<div id="add-form" class="hidden card bg-white rounded-2xl p-4 mb-4">
+  <h3 class="font-bold text-edf-500 mb-3">Nouvelle activite dans le referentiel</h3>
+  <div class="grid sm:grid-cols-3 gap-3">
+    <div>
+      <label class="block text-xs font-bold text-gray-500 mb-1">Nom de l'activite *</label>
+      <input id="ref-nom" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="Ex: Visite complete GMPP">
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-500 mb-1">Reference gamme</label>
+      <input id="ref-gamme" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="Ex: GM-001">
+    </div>
+    <div>
+      <label class="block text-xs font-bold text-gray-500 mb-1">Description</label>
+      <input id="ref-desc" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm">
+    </div>
+  </div>
+  <div class="flex gap-3 mt-3">
+    <button onclick="addRef()" class="btn bg-green-600 text-white font-bold px-5 py-2 rounded-xl text-sm">Enregistrer</button>
+    <button onclick="document.getElementById('add-form').classList.add('hidden')" class="btn bg-gray-100 text-gray-600 font-bold px-5 py-2 rounded-xl text-sm">Annuler</button>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Nom de l'activite</th><th>Gamme</th><th>Utilisations</th><th>Description</th><th>Action</th>
+      </tr></thead>
+      <tbody>
+      {% for r in refs %}
+      <tr>
+        <td class="font-semibold">{{r.nom}}</td>
+        <td class="text-gray-500 text-sm">{{r.get('gamme','')}}</td>
+        <td>
+          {% if r._nb>0 %}
+          <span class="tag-ok text-xs px-2 py-0.5 rounded-full font-bold">{{r._nb}} fois</span>
+          {% else %}
+          <span class="text-gray-400 text-xs">Non utilise</span>
+          {% endif %}
+        </td>
+        <td class="text-gray-500 text-sm">{{r.get('description','')}}</td>
+        <td>
+          <button onclick="deleteRef('{{r.nom|replace("'","\\'")}}')" class="btn bg-red-100 text-red-700 text-xs px-2 py-1 rounded-lg font-bold hover:bg-red-200">Suppr.</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if not refs %}
+      <tr><td colspan="5" class="text-center text-gray-400 py-12 text-sm">Aucune activite — cliquez "+ Ajouter"</td></tr>
+      {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-4 bg-blue-50 rounded-2xl p-4 text-sm text-blue-700">
+  <b>Conseil :</b> Les activites enregistrees ici apparaissent automatiquement dans la liste deroulante lors de la saisie d'une nouvelle activite dans l'onglet Donnees.
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function addRef(){
+  const nom=document.getElementById('ref-nom').value.trim();
+  if(!nom){showToast('Nom obligatoire','red');return;}
+  const r=await apiFetch('/api/referentiel','POST',{
+    nom,gamme:document.getElementById('ref-gamme').value,
+    description:document.getElementById('ref-desc').value
+  });
+  if(r.ok){showToast('Ajoute !');setTimeout(()=>location.reload(),500);}
+  else showToast(r.msg||'Erreur','red');
+}
+async function deleteRef(nom){
+  if(!confirm(`Supprimer "${nom}" du referentiel ?`))return;
+  const r=await apiFetch(`/api/referentiel/${encodeURIComponent(nom)}`,'DELETE');
+  if(r.ok){showToast('Supprime !');setTimeout(()=>location.reload(),500);}
+}
+</script>
+{% endblock %}
