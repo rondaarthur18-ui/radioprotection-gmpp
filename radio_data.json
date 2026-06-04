@@ -1,0 +1,13 @@
+{
+  "activites": [],
+  "actions": [],
+  "objectifs": {
+    "dose_collective_max": 5.0,
+    "dose_indiv_max": 2.0,
+    "seuil_alerte": 0.8
+  },
+  "meta": {
+    "version": "1.0",
+    "created": "2026-06-03T13:58:34.762888"
+  }
+}
