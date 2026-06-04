@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-xl font-black text-edf-500 mb-4">Analyse par activite</h1>
+
+<div class="grid sm:grid-cols-2 gap-4 mb-5">
+  <div class="card bg-white rounded-2xl p-4">
+    <div class="font-bold text-gray-700 mb-3 text-sm">Dose moyenne par activite et palier (mSv.h)</div>
+    <canvas id="chartAnalyse" height="260"></canvas>
+  </div>
+  <div class="card bg-white rounded-2xl p-4">
+    <div class="font-bold text-gray-700 mb-3 text-sm">Dose par palier (radar)</div>
+    <canvas id="chartRadar" height="260"></canvas>
+  </div>
+</div>
+
+<div class="card bg-white rounded-2xl overflow-hidden">
+  <div class="bg-green-700 text-white font-bold text-sm px-4 py-2.5">Tableau comparatif par activite et palier</div>
+  <div class="overflow-x-auto">
+    <table>
+      <thead><tr>
+        <th>Activite</th>
+        {% for p in paliers %}<th>{{p}} MW (mSv.h)</th>{% endfor %}
+        <th>Moyenne</th><th>Max</th><th>Statut</th>
+      </tr></thead>
+      <tbody>
+      {% for nom in noms %}
+      {% set row = par_activite[nom] %}
+      {% set vals = row.values()|select|list %}
+      {% set moy = (vals|sum / vals|length)|round(2) if vals else '-' %}
+      {% set maxi = vals|max if vals else 0 %}
+      <tr>
+        <td class="font-semibold text-sm max-w-xs truncate" title="{{nom}}">{{nom}}</td>
+        {% for p in paliers %}
+        <td class="text-center {% if row[p] and row[p]>seuil %}text-red-600 font-bold{% endif %}">
+          {{row[p] if row[p] else '—'}}
+        </td>
+        {% endfor %}
+        <td class="text-center font-semibold">{{moy}}</td>
+        <td class="text-center {% if maxi>seuil %}text-red-600 font-bold{% endif %}">{{maxi}}</td>
+        <td class="text-center">
+          {% if maxi>seuil %}
+          <span class="tag-critique text-xs px-2 py-0.5 rounded-full font-bold">CRITIQUE</span>
+          {% else %}
+          <span class="tag-ok text-xs px-2 py-0.5 rounded-full">OK</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const noms = {{noms|tojson}};
+const paliers = {{paliers|tojson}};
+const parAct = {{par_activite|tojson}};
+const seuil = {{seuil}};
+const pal_colors = ['rgba(0,59,142,0.85)','rgba(255,121,0,0.85)','rgba(46,134,72,0.85)'];
+
+// Top 10 activites pour le graphique
+const top10 = noms.slice(0,10);
+new Chart(document.getElementById('chartAnalyse'),{
+  type:'bar',
+  data:{
+    labels:top10.map(n=>n.length>18?n.substring(0,18)+'…':n),
+    datasets:paliers.map((p,i)=>({
+      label:p+' MW',
+      data:top10.map(n=>parAct[n][p]||0),
+      backgroundColor:pal_colors[i], borderRadius:4,
+    }))
+  },
+  options:{responsive:true,plugins:{legend:{position:'top'}},
+    scales:{y:{beginAtZero:true,grid:{color:'#F0F4F8'}},x:{grid:{display:false}}}}
+});
+
+// Radar
+new Chart(document.getElementById('chartRadar'),{
+  type:'radar',
+  data:{
+    labels:top10.map(n=>n.length>14?n.substring(0,14)+'…':n),
+    datasets:paliers.map((p,i)=>({
+      label:p+' MW',
+      data:top10.map(n=>parAct[n][p]||0),
+      borderColor:['#003B8E','#FF7900','#2E8648'][i],
+      backgroundColor:['rgba(0,59,142,.1)','rgba(255,121,0,.1)','rgba(46,134,72,.1)'][i],
+      borderWidth:2,
+    }))
+  },
+  options:{responsive:true,plugins:{legend:{position:'top'}}}
+});
+</script>
+{% endblock %}
